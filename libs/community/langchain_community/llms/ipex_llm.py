@@ -46,7 +46,7 @@ class IpexLLM(LLM):
         tokenizer_id: Optional[str] = None,
         load_in_4bit: bool = True,
         load_in_low_bit: Optional[str] = None,
-        device_map: Literal['cpu','xpu'] = 'cpu',
+        device_map: Literal["cpu", "xpu"] = "cpu",
         **kwargs: Any,
     ) -> LLM:
         """
@@ -88,7 +88,7 @@ class IpexLLM(LLM):
         model_kwargs: Optional[dict] = None,
         *,
         tokenizer_id: Optional[str] = None,
-        device_map: Literal['cpu','xpu'] = 'cpu',
+        device_map: Literal["cpu", "xpu"] = "cpu",
         **kwargs: Any,
     ) -> LLM:
         """
@@ -125,7 +125,7 @@ class IpexLLM(LLM):
         load_in_4bit: bool = False,
         load_in_low_bit: Optional[str] = None,
         low_bit_model: bool = False,
-        device_map: Literal['cpu','xpu'] = "cpu",
+        device_map: Literal["cpu", "xpu"] = "cpu",
         model_kwargs: Optional[dict] = None,
         kwargs: Optional[dict] = None,
     ) -> Any:
@@ -202,7 +202,7 @@ class IpexLLM(LLM):
                 f"'cpu' or 'xpu', but you have: {device_map}."
             )
         model.to(device_map)
-        
+
         return cls(
             model_id=model_id,
             model=model,
