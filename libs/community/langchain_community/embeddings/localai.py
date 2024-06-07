@@ -154,7 +154,7 @@ class LocalAIEmbeddings(BaseModel, Embeddings):
     """
 
     client: Any  #: :meta private:
-    async_client: Any #: :meta private:
+    async_client: Any  #: :meta private:
     model: str = "text-embedding-ada-002"
     deployment: str = model
     openai_api_version: Optional[str] = None
@@ -297,12 +297,16 @@ class LocalAIEmbeddings(BaseModel, Embeddings):
             # replace newlines, which can negatively affect performance.
             text = text.replace("\n", " ")
         return (
-            await async_embed_with_retry(
-                self,
-                input=[text],
-                **self._invocation_params,
+            (
+                await async_embed_with_retry(
+                    self,
+                    input=[text],
+                    **self._invocation_params,
+                )
             )
-        ).data[0].embedding
+            .data[0]
+            .embedding
+        )
 
     def embed_documents(
         self, texts: List[str], chunk_size: Optional[int] = 0
