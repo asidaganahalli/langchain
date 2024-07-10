@@ -3640,6 +3640,8 @@ class RunnableLambda(Runnable[Input, Output]):
             ]
         ] = None,
         name: Optional[str] = None,
+        *,
+        run_type: Optional[str] = None,
     ) -> None:
         """Create a RunnableLambda from a callable, and async callable or both.
 
@@ -3649,6 +3651,8 @@ class RunnableLambda(Runnable[Input, Output]):
         Args:
             func: Either sync or async callable
             afunc: An async callable that takes an input and returns an output.
+            name: An optional name for the runnable.
+            run_type: An optional type for the runnable.
         """
         if afunc is not None:
             self.afunc = afunc
@@ -3679,6 +3683,8 @@ class RunnableLambda(Runnable[Input, Output]):
                 self.name = func_for_name.__name__
         except AttributeError:
             pass
+
+        self.run_type = run_type
 
     @property
     def InputType(self) -> Any:
@@ -3978,6 +3984,7 @@ class RunnableLambda(Runnable[Input, Output]):
                 self._invoke,
                 input,
                 self._config(config, self.func),
+                run_type=self.run_type,
                 **kwargs,
             )
         else:
@@ -3998,6 +4005,7 @@ class RunnableLambda(Runnable[Input, Output]):
             self._ainvoke,
             input,
             self._config(config, the_func),
+            run_type=self.run_type,
             **kwargs,
         )
 
