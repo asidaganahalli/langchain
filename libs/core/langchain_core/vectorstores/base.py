@@ -24,19 +24,16 @@ from __future__ import annotations
 import logging
 import math
 import warnings
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from itertools import cycle
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterable,
-    AsyncIterator,
     Callable,
     ClassVar,
     Collection,
     Dict,
     Iterable,
-    Iterator,
     List,
     Optional,
     Sequence,
@@ -51,23 +48,23 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.pydantic_v1 import Field, root_validator
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables.config import run_in_executor
-from langchain_core.utils.aiter import abatch_iterate
-from langchain_core.utils.iter import batch_iterate
 
 if TYPE_CHECKING:
     from langchain_core.callbacks.manager import (
         AsyncCallbackManagerForRetrieverRun,
         CallbackManagerForRetrieverRun,
     )
-    from langchain_core.documents import Document
-    from langchain_core.indexing.base import UpsertResponse
+    from langchain_core.indexing.base import DeleteResponse, Sort, T, UpsertResponse
+
+from langchain_core.documents.base import Document
+from langchain_core.indexing import BaseIndex
 
 logger = logging.getLogger(__name__)
 
 VST = TypeVar("VST", bound="VectorStore")
 
 
-class VectorStore(ABC):
+class VectorStore(BaseIndex[Document]):
     """Interface for vector store."""
 
     def add_texts(
@@ -129,32 +126,6 @@ class VectorStore(ABC):
         raise NotImplementedError(
             f"`add_texts` has not been implemented for {self.__class__.__name__} "
         )
-
-    # Developer guidelines:
-    # Do not override streaming_upsert!
-    @beta(message="Added in 0.2.11. The API is subject to change.")
-    def streaming_upsert(
-        self, items: Iterable[Document], /, batch_size: int, **kwargs: Any
-    ) -> Iterator[UpsertResponse]:
-        """Upsert documents in a streaming fashion.
-
-        Args:
-            items: Iterable of Documents to add to the vectorstore.
-            batch_size: The size of each batch to upsert.
-            **kwargs: Additional keyword arguments.
-                kwargs should only include parameters that are common to all
-                documents. (e.g., timeout for indexing, retry policy, etc.)
-                kwargs should not include ids to avoid ambiguous semantics.
-                Instead the ID should be provided as part of the Document object.
-
-        .. versionadded:: 0.2.11
-        """
-        # The default implementation of this method breaks the input into
-        # batches of size `batch_size` and calls the `upsert` method on each batch.
-        # Subclasses can override this method to provide a more efficient
-        # implementation.
-        for item_batch in batch_iterate(batch_size, items):
-            yield self.upsert(item_batch, **kwargs)
 
     # Please note that we've added a new method `upsert` instead of re-using the
     # existing `add_documents` method.
@@ -226,30 +197,6 @@ class VectorStore(ABC):
         )
 
     @beta(message="Added in 0.2.11. The API is subject to change.")
-    async def astreaming_upsert(
-        self,
-        items: AsyncIterable[Document],
-        /,
-        batch_size: int,
-        **kwargs: Any,
-    ) -> AsyncIterator[UpsertResponse]:
-        """Upsert documents in a streaming fashion. Async version of streaming_upsert.
-
-        Args:
-            items: Iterable of Documents to add to the vectorstore.
-            batch_size: The size of each batch to upsert.
-            **kwargs: Additional keyword arguments.
-                kwargs should only include parameters that are common to all
-                documents. (e.g., timeout for indexing, retry policy, etc.)
-                kwargs should not include ids to avoid ambiguous semantics.
-                Instead the ID should be provided as part of the Document object.
-
-        .. versionadded:: 0.2.11
-        """
-        async for batch in abatch_iterate(batch_size, items):
-            yield await self.aupsert(batch, **kwargs)
-
-    @beta(message="Added in 0.2.11. The API is subject to change.")
     async def aupsert(
         self, items: Sequence[Document], /, **kwargs: Any
     ) -> UpsertResponse:
@@ -288,8 +235,10 @@ class VectorStore(ABC):
         )
         return None
 
-    def delete(self, ids: Optional[List[str]] = None, **kwargs: Any) -> Optional[bool]:
-        """Delete by vector ID or other criteria.
+    def delete(
+        self, ids: Optional[List[str]] = None, **kwargs: Any
+    ) -> Union[DeleteResponse, None, bool]:
+        """Delete by ID or other criteria.
 
         Args:
             ids: List of ids to delete.
@@ -302,7 +251,7 @@ class VectorStore(ABC):
 
         raise NotImplementedError("delete method must be implemented by subclass.")
 
-    def get_by_ids(self, ids: Sequence[str], /) -> List[Document]:
+    def get_by_ids(self, ids: Sequence[str], /, **kwargs: Any) -> List[Document]:
         """Get documents by their IDs.
 
         The returned documents are expected to have the ID field set to the ID of the
@@ -320,6 +269,7 @@ class VectorStore(ABC):
 
         Args:
             ids: List of ids to retrieve.
+            kwargs: Other keyword arguments these are up to the implementation.
 
         Returns:
             List of Documents.
@@ -331,7 +281,7 @@ class VectorStore(ABC):
         )
 
     # Implementations should override this method to provide an async native version.
-    async def aget_by_ids(self, ids: Sequence[str], /) -> List[Document]:
+    async def aget_by_ids(self, ids: Sequence[str], /, **kwargs: Any) -> List[Document]:
         """Get documents by their IDs.
 
         The returned documents are expected to have the ID field set to the ID of the
@@ -349,6 +299,7 @@ class VectorStore(ABC):
 
         Args:
             ids: List of ids to retrieve.
+            kwargs: Other keyword arguments these are up to the implementation.
 
         Returns:
             List of Documents.
@@ -359,8 +310,8 @@ class VectorStore(ABC):
 
     async def adelete(
         self, ids: Optional[List[str]] = None, **kwargs: Any
-    ) -> Optional[bool]:
-        """Delete by vector ID or other criteria.
+    ) -> Union[DeleteResponse, None, bool]:
+        """Delete by ID or other criteria.
 
         Args:
             ids: List of ids to delete.
@@ -564,6 +515,54 @@ class VectorStore(ABC):
                 f"search_type of {search_type} not allowed. Expected "
                 "search_type to be 'similarity', 'similarity_score_threshold' or 'mmr'."
             )
+
+    def delete_by_filter(
+        self,
+        filter: Union[Dict[str, Any], List[Dict[str, Any]]],
+        /,
+        **kwargs: Any,
+    ) -> DeleteResponse:
+        """Delete documents by filter.
+
+        Args:
+            filter: Filter to apply to documents.
+            **kwargs: Other keyword arguments that subclasses might use.
+
+        Returns:
+            DeleteResponse: A response object that contains the list of IDs that were
+            successfully deleted from the vectorstore and the list of IDs that failed
+            to be deleted.
+
+        .. versionadded:: 0.2.15
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not yet support delete_by_filter."
+        )
+
+    def get_by_filter(
+        self,
+        *,
+        filter: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
+        limit: Optional[int] = None,
+        sort: Optional[Sort] = None,
+        **kwargs: Any,
+    ) -> Iterable[T]:
+        """Get documents by filter.
+
+        Args:
+            filter: Filter to apply to documents.
+            limit: Maximum number of documents to return.
+            sort: Sort order for the returned documents.
+            **kwargs: Other keyword arguments that subclasses might use.
+
+        Returns:
+            Iterable of documents that match the filter.
+
+        .. versionadded:: 0.2.15
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not yet support get_by_filter."
+        )
 
     @abstractmethod
     def similarity_search(
