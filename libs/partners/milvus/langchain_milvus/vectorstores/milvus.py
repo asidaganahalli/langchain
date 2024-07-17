@@ -138,6 +138,30 @@ class Milvus(VectorStore):
         metadata_field (str): Name of the metadta field. Defaults to None.
             When metadata_field is specified,
             the document's metadata will store as json.
+        metadata_schema  (Optional[dict]): What is the dataType of each metadata fields,
+            Default is Varchar, Example of field schema dict is :-
+            {
+              "column1": {
+                "dtype": "DataType.ARRAY",
+                "kwargs": {
+                  "element_type": "DataType.VARCHAR",
+                  "max_capacity": 20,
+                  "max_length": 1000
+                }
+              },
+              "column2": {
+                "dtype": "DataType.ARRAY",
+                "kwargs": {
+                  "element_type": "DataType.INT64",
+                  "max_capacity": 50
+                }
+              },
+              "column3": {
+                "dtype": "DataType.INT64"
+              }
+            }
+
+
 
     The connection args used for this class comes in the form of a dict,
     here are a few of the options:
@@ -208,6 +232,7 @@ class Milvus(VectorStore):
         replica_number: int = 1,
         timeout: Optional[float] = None,
         num_shards: Optional[int] = None,
+        metadata_schema: Optional[dict[str, Any]] = None,
     ):
         """Initialize the Milvus vector store."""
         try:
@@ -267,6 +292,7 @@ class Milvus(VectorStore):
         self.replica_number = replica_number
         self.timeout = timeout
         self.num_shards = num_shards
+        self.metadata_schema = metadata_schema
 
         # Create the connection to the server
         if connection_args is None:
@@ -397,24 +423,43 @@ class Milvus(VectorStore):
                 # Create FieldSchema for each entry in metadata.
                 for key, value in metadatas[0].items():
                     # Infer the corresponding datatype of the metadata
-                    dtype = infer_dtype_bydata(value)
-                    # Datatype isn't compatible
-                    if dtype == DataType.UNKNOWN or dtype == DataType.NONE:
-                        logger.error(
-                            (
-                                "Failure to create collection, "
-                                "unrecognized dtype for key: %s"
-                            ),
-                            key,
-                        )
-                        raise ValueError(f"Unrecognized datatype for {key}.")
-                    # Dataype is a string/varchar equivalent
-                    elif dtype == DataType.VARCHAR:
+                    field_type = "dtype"
+                    if (
+                        key in self.metadata_schema  # type: ignore
+                        and field_type in self.metadata_schema[key]  # type: ignore
+                    ):
+                        kwargs = self.metadata_schema[key]["kwargs"]  # type: ignore
                         fields.append(
-                            FieldSchema(key, DataType.VARCHAR, max_length=65_535)
+                            FieldSchema(
+                                name=key,
+                                dtype=self.metadata_schema[key][field_type],  # type: ignore
+                                **kwargs,
+                            )
                         )
                     else:
-                        fields.append(FieldSchema(key, dtype))
+                        dtype = infer_dtype_bydata(value)
+                        # Datatype isn't compatible
+                        if dtype == DataType.UNKNOWN or dtype == DataType.NONE:
+                            logger.error(
+                                (
+                                    "Failure to create collection, "
+                                    "unrecognized dtype for key: %s"
+                                ),
+                                key,
+                            )
+                            raise ValueError(f"Unrecognized datatype for {key}.")
+                        # Dataype is a string/varchar equivalent
+                        elif dtype == DataType.VARCHAR:
+                            fields.append(
+                                FieldSchema(key, DataType.VARCHAR, max_length=65_535)
+                            )
+                        elif dtype == DataType.ARRAY:
+                            kwargs = self.metadata_schema[key]["kwargs"]  # type: ignore
+                            fields.append(
+                                FieldSchema(name=key, dtype=DataType.ARRAY, **kwargs)
+                            )
+                        else:
+                            fields.append(FieldSchema(key, dtype))
 
         # Create the text field
         fields.append(
