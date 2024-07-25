@@ -189,7 +189,7 @@ class Vectara(VectorStore):
         vectara_api_key: Optional[str] = None,
         vectara_api_timeout: int = 120,
         source: str = "langchain",
-    ):
+    ) -> None:
         """Initialize with Vectara API."""
         self._vectara_customer_id = vectara_customer_id or os.environ.get(
             "VECTARA_CUSTOMER_ID"
@@ -359,7 +359,7 @@ class Vectara(VectorStore):
 
     def add_texts(
         self,
-        texts: Iterable[str],
+        texts: List[str],
         metadatas: Optional[List[dict]] = None,
         doc_metadata: Optional[dict] = None,
         **kwargs: Any,
