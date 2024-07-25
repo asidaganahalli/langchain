@@ -32,6 +32,7 @@ class InMemoryVectorStore(VectorStore):
     """In-memory implementation of VectorStore using a dictionary.
 
     Uses numpy to compute cosine similarity for search.
+    The embedded vector is stored in metadata.
     """
 
     def __init__(self, embedding: Embeddings) -> None:
@@ -40,9 +41,7 @@ class InMemoryVectorStore(VectorStore):
         Args:
             embedding: embedding function to use.
         """
-        # TODO: would be nice to change to
-        # Dict[str, Document] at some point (will be a breaking change)
-        self.store: Dict[str, Dict[str, Any]] = {}
+        self.store: Dict[str, Document] = {}
         self.embedding = embedding
 
     @property
@@ -63,12 +62,11 @@ class InMemoryVectorStore(VectorStore):
         for item, vector in zip(items, vectors):
             doc_id = item.id if item.id else str(uuid.uuid4())
             ids.append(doc_id)
-            self.store[doc_id] = {
-                "id": doc_id,
-                "vector": vector,
-                "text": item.page_content,
-                "metadata": item.metadata,
-            }
+            metadata = item.metadata
+            metadata["vector"] = vector
+            self.store[doc_id] = Document(
+                id=doc_id, page_content=item.page_content, metadata=metadata
+            )
         return {
             "succeeded": ids,
             "failed": [],
@@ -88,13 +86,7 @@ class InMemoryVectorStore(VectorStore):
         for doc_id in ids:
             doc = self.store.get(doc_id)
             if doc:
-                documents.append(
-                    Document(
-                        id=doc["id"],
-                        page_content=doc["text"],
-                        metadata=doc["metadata"],
-                    )
-                )
+                documents.append(doc)
         return documents
 
     async def aget_by_ids(self, ids: Sequence[str], /) -> List[Document]:
@@ -125,13 +117,11 @@ class InMemoryVectorStore(VectorStore):
     ) -> List[Tuple[Document, float, List[float]]]:
         result = []
         for doc in self.store.values():
-            vector = doc["vector"]
+            vector = doc.metadata["vector"]
             similarity = float(cosine_similarity([embedding], [vector]).item(0))
             result.append(
                 (
-                    Document(
-                        id=doc["id"], page_content=doc["text"], metadata=doc["metadata"]
-                    ),
+                    doc,
                     similarity,
                     vector,
                 )
