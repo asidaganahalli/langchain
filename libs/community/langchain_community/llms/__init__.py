@@ -652,6 +652,12 @@ def _import_volcengine_maas() -> Type[BaseLLM]:
     return VolcEngineMaasLLM
 
 
+def _import_volcengine_maas_v3() -> Type[BaseLLM]:
+    from langchain_community.llms.volcengine_maas import VolcEngineMaasLLMV3
+
+    return VolcEngineMaasLLMV3
+
+
 def _import_sparkllm() -> Type[BaseLLM]:
     from langchain_community.llms.sparkllm import SparkLLM
 
@@ -857,6 +863,8 @@ def __getattr__(name: str) -> Any:
         return _import_you()
     elif name == "VolcEngineMaasLLM":
         return _import_volcengine_maas()
+    elif name == "VolcEngineMaasLLMV3":
+        return _import_volcengine_maas_v3()
     elif name == "type_to_cls_dict":
         # for backwards compatibility
         type_to_cls_dict: Dict[str, Type[BaseLLM]] = {
@@ -962,6 +970,7 @@ __all__ = [
     "VertexAI",
     "VertexAIModelGarden",
     "VolcEngineMaasLLM",
+    "VolcEngineMaasLLMV3",
     "WatsonxLLM",
     "WeightOnlyQuantPipeline",
     "Writer",
@@ -1067,5 +1076,6 @@ def get_type_to_cls_dict() -> Dict[str, Callable[[], Type[BaseLLM]]]:
         "yuan2": _import_yuan2,
         "you": _import_you,
         "VolcEngineMaasLLM": _import_volcengine_maas,
+        "VolcEngineMaasLLMV3": _import_volcengine_maas_v3,
         "SparkLLM": _import_sparkllm,
     }

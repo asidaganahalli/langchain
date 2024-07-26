@@ -52,6 +52,7 @@ EXPECTED_ALL = [
     "SolarChat",
     "QianfanChatEndpoint",
     "VolcEngineMaasChat",
+    "VolcEngineMaasChatV3",
     "ChatOctoAI",
     "ChatSnowflakeCortex",
 ]
