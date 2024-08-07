@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Tuple
+from typing import Optional as Optional
 
 from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts.base import BasePromptTemplate
@@ -106,3 +107,6 @@ class PipelinePromptTemplate(BasePromptTemplate):
     @property
     def _prompt_type(self) -> str:
         raise ValueError
+
+
+PipelinePromptTemplate.update_forward_refs()
