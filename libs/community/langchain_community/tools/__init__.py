@@ -28,6 +28,9 @@ if TYPE_CHECKING:
         tool,
     )
 
+    from langchain_community.tools.mindsdb import (
+        AIMindTool
+    )
     from langchain_community.tools.ainetwork.app import (
         AINAppOps,
     )
@@ -338,6 +341,7 @@ if TYPE_CHECKING:
     )
 
 __all__ = [
+    "AIMindTool",
     "AINAppOps",
     "AINOwnerOps",
     "AINRuleOps",
@@ -491,6 +495,7 @@ __all__ = [
 _DEPRECATED_TOOLS = {"PythonAstREPLTool", "PythonREPLTool"}
 
 _module_lookup = {
+    "AIMindTool": "langchain_community.tools.mindsdb.tool",
     "AINAppOps": "langchain_community.tools.ainetwork.app",
     "AINOwnerOps": "langchain_community.tools.ainetwork.owner",
     "AINRuleOps": "langchain_community.tools.ainetwork.rule",
