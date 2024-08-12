@@ -9,6 +9,8 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
 
+from langchain_milvus.utils.sparse import BaseSparseEmbedding
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_MILVUS_CONNECTION = {
@@ -219,7 +221,7 @@ class Milvus(VectorStore):
 
     def __init__(
         self,
-        embedding_function: Embeddings,
+        embedding_function: Embeddings | BaseSparseEmbedding,
         collection_name: str = "LangChainCollection",
         collection_description: str = "",
         collection_properties: Optional[dict[str, Any]] = None,
@@ -275,6 +277,11 @@ class Milvus(VectorStore):
             },
             "GPU_IVF_FLAT": {"metric_type": "L2", "params": {"nprobe": 10}},
             "GPU_IVF_PQ": {"metric_type": "L2", "params": {"nprobe": 10}},
+            "SPARSE_INVERTED_INDEX": {
+                "metric_type": "IP",
+                "params": {"drop_ratio_build": 0.2},
+            },
+            "SPARSE_WAND": {"metric_type": "IP", "params": {"drop_ratio_build": 0.2}},
         }
 
         self.embedding_func = embedding_function
@@ -338,7 +345,7 @@ class Milvus(VectorStore):
         )
 
     @property
-    def embeddings(self) -> Embeddings:
+    def embeddings(self) -> Embeddings | BaseSparseEmbedding:
         return self.embedding_func
 
     def _create_connection_alias(self, connection_args: dict) -> str:
@@ -511,9 +518,16 @@ class Milvus(VectorStore):
                 )
             )
         # Create the vector field, supports binary or float vectors
-        fields.append(
-            FieldSchema(self._vector_field, infer_dtype_bydata(embeddings[0]), dim=dim)
-        )
+        if isinstance(self.embedding_func, BaseSparseEmbedding):
+            fields.append(
+                FieldSchema(self._vector_field, DataType.SPARSE_FLOAT_VECTOR, dim=dim)
+            )
+        else:
+            fields.append(
+                FieldSchema(
+                    self._vector_field, infer_dtype_bydata(embeddings[0]), dim=dim
+                )
+            )
 
         # Create the schema for the collection
         schema = CollectionSchema(
@@ -578,11 +592,18 @@ class Milvus(VectorStore):
             try:
                 # If no index params, use a default HNSW based one
                 if self.index_params is None:
-                    self.index_params = {
-                        "metric_type": "L2",
-                        "index_type": "HNSW",
-                        "params": {"M": 8, "efConstruction": 64},
-                    }
+                    if isinstance(self.embedding_func, BaseSparseEmbedding):
+                        self.index_params = {
+                            "metric_type": "IP",
+                            "index_type": "SPARSE_INVERTED_INDEX",
+                            "params": {"drop_ratio_build": 0.2},
+                        }
+                    else:
+                        self.index_params = {
+                            "metric_type": "L2",
+                            "index_type": "HNSW",
+                            "params": {"M": 8, "efConstruction": 64},
+                        }
 
                 try:
                     self.col.create_index(
@@ -1143,7 +1164,7 @@ class Milvus(VectorStore):
     def from_texts(
         cls,
         texts: List[str],
-        embedding: Embeddings,
+        embedding: Embeddings | BaseSparseEmbedding,
         metadatas: Optional[List[dict]] = None,
         collection_name: str = "LangChainCollection",
         connection_args: dict[str, Any] = DEFAULT_MILVUS_CONNECTION,
