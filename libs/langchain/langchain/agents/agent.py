@@ -1047,7 +1047,7 @@ NextStepOutput = List[Union[AgentFinish, AgentAction, AgentStep]]
 class AgentExecutor(Chain):
     """Agent that is using tools."""
 
-    agent: Union[BaseSingleActionAgent, BaseMultiActionAgent]
+    agent: Union[BaseSingleActionAgent, BaseMultiActionAgent, Runnable]
     """The agent to run for creating a plan and determining actions
     to take at each step of the execution loop."""
     tools: Sequence[BaseTool]
@@ -1095,7 +1095,7 @@ class AgentExecutor(Chain):
     @classmethod
     def from_agent_and_tools(
         cls,
-        agent: Union[BaseSingleActionAgent, BaseMultiActionAgent],
+        agent: Union[BaseSingleActionAgent, BaseMultiActionAgent, Runnable],
         tools: Sequence[BaseTool],
         callbacks: Callbacks = None,
         **kwargs: Any,
