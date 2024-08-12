@@ -165,7 +165,8 @@ const config = {
             label: "Integrations",
           },
           {
-            href: "https://api.python.langchain.com",
+            type: "doc",
+            docId: "api_redirect",
             label: "API Reference",
             position: "left",
           },
